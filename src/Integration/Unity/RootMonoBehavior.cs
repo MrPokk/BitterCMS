@@ -7,10 +7,13 @@ namespace BitterCMS.UnityIntegration
     {
         protected abstract void GlobalStart();
         protected virtual void PreGlobalStart() { }
+        protected virtual void FindExtraInteraction(Interaction interaction) { }
+        
         void IRoot.PreStartGame()
         {
             PreInit(this, out var interaction);
-            FindInteraction(interaction);
+            FindCoreInteraction(interaction);
+            FindExtraInteraction(interaction);
             PreGlobalStart();
             GlobalStart();
         }
@@ -30,7 +33,7 @@ namespace BitterCMS.UnityIntegration
                 element.PhysicUpdate(timeDelta);
             }
         }
-        
+
         void IRoot.LateUpdateGame(float timeDelta)
         {
             foreach (var element in InteractionCache<IEnterInLateUpdate>.AllInteraction)
@@ -46,22 +49,22 @@ namespace BitterCMS.UnityIntegration
                 element.Stop();
             }
         }
-        
+
         private void Awake()
         {
             ((IRoot)this).PreStartGame();
         }
-        
+
         private void Update()
         {
             ((IRoot)this).UpdateGame(Time.deltaTime);
         }
-        
+
         private void FixedUpdate()
         {
             ((IRoot)this).PhysicUpdateGame(Time.deltaTime);
         }
-        
+
         private void LateUpdate()
         {
             ((IRoot)this).LateUpdateGame(Time.deltaTime);
@@ -71,7 +74,7 @@ namespace BitterCMS.UnityIntegration
         {
             ((IRoot)this).StoppedGame();
         }
-        
+
         private static void PreInit(IRoot baseMain, out Interaction interaction)
         {
             interaction = new Interaction();
@@ -80,7 +83,7 @@ namespace BitterCMS.UnityIntegration
             GlobalState.SetRoot(baseMain);
         }
 
-        protected virtual void FindInteraction(Interaction interaction)
+        private void FindCoreInteraction(Interaction interaction)
         {
 
             var init = interaction.FindAll<IInitInRoot>();
@@ -98,9 +101,9 @@ namespace BitterCMS.UnityIntegration
             interaction.FindAll<IEnterInUpdate>();
             interaction.FindAll<IEnterInPhysicUpdate>();
             interaction.FindAll<IEnterInLateUpdate>();
-            
+
             interaction.FindAll<IColliderInteraction>();
-            
+
             interaction.FindAll<IExitInGame>();
         }
     }

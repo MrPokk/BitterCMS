@@ -21,10 +21,25 @@ namespace BitterCMS.CMSSystem
 
         [XmlIgnore]
         public Type ID => GetType();
-        
+
         [XmlIgnore]
         [field: NonSerialized]
         public CMSPresenterCore.CMSPresenterProperty Properties { get; set; }
+
+        /// <summary>
+        /// Updates all serializable components
+        /// </summary>
+        public void RefreshComponent()
+        {
+            if (SerializerUtility.TryDeserialize(ID, EntityDatabase.GetPath(ID)) is not CMSEntityCore deserializeEntity)
+                return;
+            
+            var allDeserializeComponent = deserializeEntity.GetAllComponents();
+            foreach (var typeComponent in deserializeEntity.GetExtraType())
+            {
+                _components[typeComponent] = allDeserializeComponent[typeComponent];
+            }
+        }
 
         /// <summary>
         /// Gets the number of components attached to this entity
@@ -43,7 +58,7 @@ namespace BitterCMS.CMSSystem
         /// </summary>
         public bool TryGetView(out CMSViewCore view)
         {
-            if (TryGetComponent<ViewComponent>(out var viewComponent) && 
+            if (TryGetComponent<ViewComponent>(out var viewComponent) &&
                 viewComponent?.Properties != null)
             {
                 view = viewComponent.Properties.Current;
@@ -53,7 +68,7 @@ namespace BitterCMS.CMSSystem
             view = null;
             return false;
         }
-        
+
         /// <summary>
         /// Gets the associated view or null if not found
         /// </summary>
@@ -91,11 +106,11 @@ namespace BitterCMS.CMSSystem
                 component = (T)foundComponent;
                 return true;
             }
-    
+
             component = null;
             return false;
         }
-        
+
         /// <summary>
         /// Gets a component of specified type or null if not found
         /// </summary>
@@ -162,10 +177,7 @@ namespace BitterCMS.CMSSystem
 
         public void ReadXml(XmlReader reader)
         {
-            EntitySerializer.ReadXml(reader, (type, component) => 
-            {
-                _components[type] = component;
-            });
+            EntitySerializer.ReadXml(reader, (type, component) => { _components[type] = component; });
         }
 
         public void WriteXml(XmlWriter writer)

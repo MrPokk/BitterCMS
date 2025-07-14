@@ -61,6 +61,7 @@ namespace BitterCMS.System.Serialization
 
             reader.ReadEndElement();
         }
+        
         public static void WriteXml(XmlWriter writer, IEnumerable<IEntityComponent> allSerializeComponents)
         {
             writer.WriteAttributeString("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");

@@ -16,7 +16,7 @@ namespace BitterCMS.CMSSystem
 
         public CMSEntityCore GetModel()
         {
-            return Properties.PresenterCore.GetEntityByID(this);
+            return Properties.PresenterCore.GetEntityByView(this);
         }
 
         public T GetModel<T>() where T : CMSEntityCore

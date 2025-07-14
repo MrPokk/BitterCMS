@@ -11,9 +11,11 @@ namespace BitterCMS.CMSSystem
 {
     public abstract class CMSPresenterCore : InteractionCore, IEnterInLateUpdate
     {
-        private readonly Dictionary<CMSViewCore, CMSEntityCore> _loadedEntity = new Dictionary<CMSViewCore, CMSEntityCore>();
+        private readonly Dictionary<CMSEntityCore, CMSViewCore> _entitiesWithViews = new Dictionary<CMSEntityCore, CMSViewCore>();
+        private readonly List<CMSEntityCore> _entitiesWithoutViews = new List<CMSEntityCore>();
         private readonly HashSet<Type> _allowedEntityTypes = new HashSet<Type>();
-        private readonly static HashSet<CMSViewCore> AllDestroy = new HashSet<CMSViewCore>();
+
+        private readonly static HashSet<CMSEntityCore> AllDestroy = new HashSet<CMSEntityCore>();
 
         protected CMSPresenterCore(params Type[] allowedTypes)
         {
@@ -36,6 +38,7 @@ namespace BitterCMS.CMSSystem
                 PresenterCore = presenterCore;
             }
         }
+
         private struct CMSPresenterInfo
         {
             public readonly Type Type;
@@ -59,9 +62,8 @@ namespace BitterCMS.CMSSystem
         /// <summary>
         /// Spawn entity from database if the type is [Serializable], other creates of type
         /// </summary>
-        public virtual CMSViewCore SpawnFromDB(
-            Type type,
-            Vector3 position = default, Quaternion rotation = default, Transform parent = null
+        public virtual CMSEntityCore SpawnFromDB(
+            Type type, Vector3 position = default, Quaternion rotation = default, Transform parent = null
         )
         {
             var info = new CMSPresenterInfo(type, position, rotation, parent);
@@ -74,32 +76,60 @@ namespace BitterCMS.CMSSystem
         }
 
         /// <summary>
+        /// Spawn entity from database if the type is [Serializable], other creates of type
+        /// </summary>
+        public virtual T SpawnFromDB<T>(
+            Vector3 position = default, Quaternion rotation = default, Transform parent = null
+        ) where T : CMSEntityCore
+        {
+            return SpawnFromDB(typeof(T), position, rotation, parent) as T;
+        }
+
+        /// <summary>
         /// Spawn a new entity of type
         /// </summary>
-        public virtual CMSViewCore SpawnEntity(
-            Type type,
-            Vector3 position = default, Quaternion rotation = default, Transform parent = null
+        public virtual CMSEntityCore SpawnEntity(
+            Type type, Vector3 position = default, Quaternion rotation = default, Transform parent = null
         )
         {
             return Create(new CMSPresenterInfo(type, position, rotation, parent));
         }
 
         /// <summary>
+        /// Spawn a new entity of type
+        /// </summary>
+        public virtual T SpawnEntity<T>(
+            Vector3 position = default, Quaternion rotation = default, Transform parent = null
+        ) where T : CMSEntityCore
+        {
+            return SpawnEntity(typeof(T), position, rotation, parent) as T;
+        }
+
+        /// <summary>
         /// Spawn an entity from an existing CMSEntity instance
         /// </summary>
-        public virtual CMSViewCore SpawnEntity(
-            CMSEntityCore valueEntityCore,
-            Vector3 position = default, Quaternion rotation = default, Transform parent = null
+        public virtual CMSEntityCore SpawnEntity(
+            CMSEntityCore valueEntityCore, Vector3 position = default, Quaternion rotation = default, Transform parent = null
         )
         {
             return Create(valueEntityCore, new CMSPresenterInfo(valueEntityCore.GetType(), position, rotation, parent));
+        }
+
+        /// <summary>
+        /// Spawn an entity from an existing CMSEntity instance
+        /// </summary>
+        public virtual T SpawnEntity<T>(
+            T valueEntityCore, Vector3 position = default, Quaternion rotation = default, Transform parent = null
+        ) where T : CMSEntityCore
+        {
+            return SpawnEntity((CMSEntityCore)valueEntityCore, position, rotation, parent) as T;
         }
 
         #endregion
 
         #region [CreateEntity]
 
-        private CMSViewCore Create(CMSPresenterInfo info)
+        private CMSEntityCore Create(CMSPresenterInfo info)
         {
             if (info.Type.IsAbstract)
                 throw new TypeAccessException($"Type {info.Type.Name} is Abstract!");
@@ -110,29 +140,53 @@ namespace BitterCMS.CMSSystem
             if (!typeof(CMSEntityCore).IsAssignableFrom(info.Type))
                 throw new TypeAccessException($"Type {info.Type.Name} is not a CMSEntity!");
 
-            if (Activator.CreateInstance(info.Type) is not CMSEntityCore newObject)
+            if (Activator.CreateInstance(info.Type) is not CMSEntityCore newEntityCore)
                 return null;
 
-            newObject.Init(new CMSPresenterProperty(this));
+            newEntityCore.Init(new CMSPresenterProperty(this));
 
-            if (!newObject.TryGetComponent<ViewComponent>(out var view))
-                return null;
+            if (!newEntityCore.TryGetComponent<ViewComponent>(out var view))
+            {
+                #if DEBUG || UNITY_EDITOR
+                Debug.LogWarning($"Not found ViewComponent in {newEntityCore}");
+                #endif
+                _entitiesWithoutViews.Add(newEntityCore);
+                return newEntityCore;
+            }
 
-            var newView = LinkingMonobehaviour(newObject, view, info.Position, info.Rotation, info.Parent);
+            var newView = LinkingMonobehaviour(newEntityCore, view, info.Position, info.Rotation, info.Parent);
             newView?.Init(new CMSPresenterProperty(this));
-            return newView;
+
+            if (newView != null)
+                _entitiesWithViews.Add(newEntityCore, newView);
+            else
+                _entitiesWithoutViews.Add(newEntityCore);
+
+            return newEntityCore;
         }
 
-        private CMSViewCore Create(CMSEntityCore cmsEntityCore, CMSPresenterInfo info)
+        private CMSEntityCore Create(CMSEntityCore cmsEntityCore, CMSPresenterInfo info)
         {
             cmsEntityCore.Init(new CMSPresenterProperty(this));
 
             if (!cmsEntityCore.TryGetComponent<ViewComponent>(out var view))
-                return null;
+            {
+                #if DEBUG || UNITY_EDITOR
+                Debug.LogWarning($"Not found ViewComponent in {cmsEntityCore}");
+                #endif
+                _entitiesWithoutViews.Add(cmsEntityCore);
+                return cmsEntityCore;
+            }
 
             var newView = LinkingMonobehaviour(cmsEntityCore, view, info.Position, info.Rotation, info.Parent);
             newView?.Init(new CMSPresenterProperty(this));
-            return newView;
+
+            if (newView != null)
+                _entitiesWithViews.Add(cmsEntityCore, newView);
+            else
+                _entitiesWithoutViews.Add(cmsEntityCore);
+
+            return cmsEntityCore;
         }
 
         #endregion
@@ -151,8 +205,6 @@ namespace BitterCMS.CMSSystem
             newView.name = $"{entityCore.ID.Name} [NEW]";
 
             view.Properties.Current = newView;
-            _loadedEntity[newView] = entityCore;
-
             return newView;
         }
 
@@ -163,15 +215,12 @@ namespace BitterCMS.CMSSystem
         /// <summary>
         /// Filters entities based on required and excluded component types
         /// </summary>
-        /// <param name="requiredComponents">Component types that entities must have (null to ignore)</param>
-        /// <param name="excludedComponents">Component types that entities must not have (null to ignore)</param>
-        /// <returns>Array of entities matching the filter criteria</returns>
         public CMSEntityCore[] FilterEntities(
             Type[] requiredComponents = null,
             Type[] excludedComponents = null
         )
         {
-            var allEntity = GetModelEntities();
+            var allEntity = GetAllEntities();
 
             return allEntity.Where(entity => {
                 var hasRequired = requiredComponents == null ||
@@ -187,15 +236,12 @@ namespace BitterCMS.CMSSystem
         /// <summary>
         /// Filters entities that have all specified component types
         /// </summary>
-        /// <param name="typeComponent">Component types that entities must have</param>
-        /// <returns>Array of entities containing all specified components</returns>
         public CMSEntityCore[] FilterEntities(params Type[] typeComponent)
         {
-            var allEntity = GetModelEntities();
+            var allEntity = GetAllEntities();
 
             return (from entity in allEntity
-                let hasAllComponents =
-                    typeComponent.All(entity.HasComponent)
+                let hasAllComponents = typeComponent.All(entity.HasComponent)
                 where hasAllComponents
                 select entity).ToArray();
         }
@@ -203,14 +249,11 @@ namespace BitterCMS.CMSSystem
         /// <summary>
         /// Filters entities that have TRequired component but don't have TExcluded component
         /// </summary>
-        /// <typeparam name="TRequired">Required component type</typeparam>
-        /// <typeparam name="TExcluded">Excluded component type</typeparam>
-        /// <returns>Collection of entities matching the component criteria</returns>
         public IReadOnlyCollection<CMSEntityCore> FilterEntities<TRequired, TExcluded>()
             where TRequired : IEntityComponent
             where TExcluded : IEntityComponent
         {
-            return GetModelEntities()
+            return GetAllEntities()
                 .Where(entity => entity.HasComponent<TRequired>() && !entity.HasComponent<TExcluded>())
                 .ToArray();
         }
@@ -218,59 +261,64 @@ namespace BitterCMS.CMSSystem
         /// <summary>
         /// Filters entities that have the specified component type
         /// </summary>
-        /// <typeparam name="TRequire">Component type that entities must have</typeparam>
-        /// <returns>Collection of entities containing the specified component</returns>
         public IReadOnlyCollection<CMSEntityCore> FilterEntities<TRequire>() where TRequire : IEntityComponent
         {
-            return GetModelEntities().Where(entity => entity.HasComponent<TRequire>()).ToArray();
+            return GetAllEntities().Where(entity => entity.HasComponent<TRequire>()).ToArray();
         }
 
         /// <summary>
-        /// Gets entity of specific type by its view ID
+        /// Gets entity of specific type by its view 
         /// </summary>
-        /// <typeparam name="T">Type of entity to retrieve</typeparam>
-        /// <param name="ID">View ID of the entity</param>
-        /// <returns>Entity cast to specified type or null if not found</returns>
-        public T GetEntityByID<T>(in CMSViewCore ID) where T : CMSEntityCore => GetEntityByID(ID) as T;
+        public T GetEntityByView<T>(CMSViewCore viewCore) where T : CMSEntityCore => GetEntityByView(viewCore) as T;
 
         /// <summary>
-        /// Gets entity by its view ID
+        /// Gets entity by its view 
         /// </summary>
-        /// <param name="ID">View ID of the entity</param>
-        /// <returns>Entity or null if not found</returns>
-        public CMSEntityCore GetEntityByID(in CMSViewCore ID) => ID ? _loadedEntity.GetValueOrDefault(ID) : null;
+        public CMSEntityCore GetEntityByView(CMSViewCore viewCore) => !viewCore ? null : _entitiesWithViews.FirstOrDefault(pair => pair.Value == viewCore).Key;
+
+        /// <summary>
+        /// Gets view by its entity
+        /// </summary>
+        public CMSViewCore GetViewByEntity(CMSEntityCore entityCore) => entityCore == null ? null : _entitiesWithViews.GetValueOrDefault(entityCore);
 
         /// <summary>
         /// Gets entity of specific type by its type
         /// </summary>
-        /// <typeparam name="T">Type of entity to retrieve</typeparam>
-        /// <returns>Entity cast to specified type or null if not found</returns>
         public T GetEntityByType<T>() where T : CMSEntityCore => GetEntityByType(typeof(T)) as T;
 
         /// <summary>
         /// Gets entity by its type
         /// </summary>
-        /// <param name="type">Type of entity to retrieve</param>
-        /// <returns>Entity or null if not found</returns>
-        public CMSEntityCore GetEntityByType(Type type) => _loadedEntity.Values.FirstOrDefault(entity => entity.ID == type);
+        public CMSEntityCore GetEntityByType(Type type)
+        {
+            return GetAllEntities().FirstOrDefault(entity => entity.ID == type);
+        }
 
         /// <summary>
         /// Gets all entities with their view associations
         /// </summary>
-        /// <returns>Read-only dictionary of view-entity pairs</returns>
-        public IReadOnlyDictionary<CMSViewCore, CMSEntityCore> GetEntities() => _loadedEntity;
+        public IReadOnlyDictionary<CMSEntityCore, CMSViewCore> GetEntitiesWithViews() => _entitiesWithViews;
+
+        /// <summary>
+        /// Gets all entities without views
+        /// </summary>
+        public IReadOnlyCollection<CMSEntityCore> GetEntitiesWithoutViews() => _entitiesWithoutViews;
+
+        /// <summary>
+        /// Gets all entities (both with and without views)
+        /// </summary>
+        public IReadOnlyCollection<CMSEntityCore> GetAllEntities()
+        {
+            var allEntities = new List<CMSEntityCore>(_entitiesWithViews.Count + _entitiesWithoutViews.Count);
+            allEntities.AddRange(_entitiesWithViews.Keys);
+            allEntities.AddRange(_entitiesWithoutViews);
+            return allEntities;
+        }
 
         /// <summary>
         /// Gets all view instances of loaded entities
         /// </summary>
-        /// <returns>Read-only collection of entity views</returns>
-        public IReadOnlyCollection<CMSViewCore> GetViewEntities() => _loadedEntity.Keys;
-
-        /// <summary>
-        /// Gets all entity models (without view references)
-        /// </summary>
-        /// <returns>Read-only collection of entity models</returns>
-        public IReadOnlyCollection<CMSEntityCore> GetModelEntities() => _loadedEntity.Values;
+        public IReadOnlyCollection<CMSViewCore> GetViewEntities() => _entitiesWithViews.Values;
 
         #endregion
 
@@ -281,30 +329,39 @@ namespace BitterCMS.CMSSystem
             if (!AllDestroy.Any())
                 return;
 
-            foreach (var viewDestroy in AllDestroy)
+            foreach (var entityToDestroy in AllDestroy)
             {
-                _loadedEntity.Remove(viewDestroy);
-                Object.Destroy(viewDestroy.gameObject);
+                if (_entitiesWithViews.TryGetValue(entityToDestroy, out var view))
+                {
+                    Object.Destroy(view.gameObject);
+                    _entitiesWithViews.Remove(entityToDestroy);
+                }
+                else if (_entitiesWithoutViews.Contains(entityToDestroy))
+                {
+                    _entitiesWithoutViews.Remove(entityToDestroy);
+                }
             }
             AllDestroy.Clear();
         }
 
-        public virtual void DestroyEntity(in CMSViewCore ID)
+        public virtual void DestroyEntity(CMSEntityCore entityCore)
         {
-            if (!ID)
+            if (entityCore == null)
                 return;
 
-            AllDestroy.Add(ID);
+            AllDestroy.Add(entityCore);
         }
 
         public virtual void DestroyAllEntities()
         {
-            foreach (var entity in _loadedEntity.Keys)
+            foreach (var view in _entitiesWithViews.Values)
             {
-                if (entity && entity.gameObject)
-                    Object.Destroy(entity.gameObject);
+                if (view && view.gameObject)
+                    Object.Destroy(view.gameObject);
             }
-            _loadedEntity.Clear();
+
+            _entitiesWithViews.Clear();
+            _entitiesWithoutViews.Clear();
         }
 
         #endregion
