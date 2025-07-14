@@ -118,6 +118,67 @@ CMSRuntimer.GetPresenter<ExamplePresent>().FilterEntities(
 CMSRuntimer.GetPresenter<ExamplePresent>().FilterEntities(typeof(HealthComponent), typeof(ShieldComponent));
 ```
 
+### Система интеракций
+#### InteractionCore
+Это система через которую реализуется основаня логика игры. Все базовые действие представленны ввиде интерфейсов
+
+Часто используемыен:
+- IEnterInStart
+- IEnterInUpdate
+- IEnterInUpdate
+- IExitInGame
+
+Также при помощи Priority можно узавывать важность Interaction
+
+Пример реализации Interaction и базовых действий 
+```csharp
+public class ExampleInteraction : InteractionCore, IEnterInUpdate, IEnterInStart, IExitInGame, IEnterInPhysicUpdate
+{
+    public override Priority PriorityInteraction => Priority.Medium;
+
+    public void Start()
+    { }
+
+    public void Update(float timeDelta)
+    { }
+
+    public void PhysicUpdate(float timeDelta)
+    { }
+
+    public void Stop()
+    { }
+}
+```
+
+#### Добавления своих интеракций
+
+Пример добавления свой интеракции в Root
+```csharp
+public class Root : RootMonoBehavior
+{
+    protected override void GlobalStart()
+    {
+        // Получения интеракций и вызов у них метода
+        foreach (var interaction in InteractionCache<IExampleInteraction>.AllInteraction)
+        {
+            interaction.ExampleVoid();
+        }
+    }
+    
+    //Добавления новой инеракци
+    protected override void FindExtraInteraction(Interaction interaction)
+    {
+        interaction.FindAll<IExampleInteraction>();
+    }
+}
+
+// Интеракция
+public interface IExampleInteraction
+{
+    public void ExampleVoid();
+}
+```
+
 ## Интеграция с редактором
 
 ### Возможности редактора
