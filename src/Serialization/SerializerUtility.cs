@@ -102,7 +102,7 @@ namespace BitterCMS.System.Serialization
             }
         }
 
-        private static XmlSerializer GetXmlSerializer(Type typeSerializer)
+        public static XmlSerializer GetXmlSerializer(Type typeSerializer)
         {
             XmlSerializer serializer;
 
