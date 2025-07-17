@@ -40,16 +40,13 @@ namespace BitterCMS.System.Serialization
             }
         }
 
-        public static object TryDeserialize(Type typeSerializer, string fullPath)
+        public static object TryDeserialize(Type typeSerializer, string xmlFile)
         {
             try
             {
-                ValidationPath(fullPath);
-
                 var serializer = GetXmlSerializer(typeSerializer);
 
-                using var fileStream = new FileStream(fullPath, FileMode.Open);
-
+                using var fileStream = new StringReader(xmlFile);
                 return serializer.Deserialize(fileStream);
             }
             catch (SerializationException ex)
@@ -58,9 +55,9 @@ namespace BitterCMS.System.Serialization
             }
         }
 
-        public static Type GetTypeFromXmlFile(string xmlFilePath, Type typeComparison = null)
+        public static Type GetTypeFromXmlFile(string filePath, Type typeComparison = null)
         {
-            ValidationPath(xmlFilePath);
+            ValidationPath(filePath);
 
             try
             {
@@ -71,7 +68,7 @@ namespace BitterCMS.System.Serialization
                     DtdProcessing = DtdProcessing.Ignore
                 };
 
-                using var reader = XmlReader.Create(xmlFilePath, settings);
+                using var reader = XmlReader.Create(filePath, settings);
 
                 reader.MoveToContent();
                 var rootElementName = reader.LocalName;
@@ -160,7 +157,7 @@ namespace BitterCMS.System.Serialization
 
         public static string TrySerialize(ISerializerProvider serializerProvider) => serializerProvider.Serialization();
         public static object TryDeserialize(ISerializerProvider serializerProvider) => serializerProvider.Deserialize();
-        public static T TryDeserialize<T>(string fullPath) where T : class, new() => TryDeserialize(typeof(T), fullPath) as T;
+        public static T TryDeserialize<T>(string xmlFile) where T : class, new() => TryDeserialize(typeof(T), xmlFile) as T;
         public static T TryDeserialize<T>(ISerializerProvider serializerProvider) where T : class, new() => TryDeserialize(serializerProvider) as T;
     }
 }

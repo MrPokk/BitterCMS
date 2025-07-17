@@ -5,15 +5,16 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using UnityEngine;
 
 namespace BitterCMS.CMSSystem
 {
     /// <summary>
-    /// Database for managing CMS entities and their storage paths
+    /// Database for managing CMS entities and their XML data
     /// </summary>
     public class EntityDatabase : CMSDatabaseCore
     {
-        private readonly static Dictionary<Type, string> AllEntity = new Dictionary<Type, string>();
+        private readonly static Dictionary<Type, string> AllEntityXmlData = new Dictionary<Type, string>();
 
         /// <summary>
         /// Gets an entity by its type
@@ -26,11 +27,10 @@ namespace BitterCMS.CMSSystem
             if (!typeof(CMSEntityCore).IsAssignableFrom(typeEntity))
                 throw new TypeAccessException("Type must inherit from CMSEntity");
 
-            var path = GetPath(typeEntity);
-            if (string.IsNullOrEmpty(path))
-                throw new EntityNotFoundException($"Path not found for entity type: {typeEntity.Name}");
+            if (!AllEntityXmlData.TryGetValue(typeEntity, out var xmlData))
+                throw new EntityNotFoundException($"XML data not found for entity type: {typeEntity.Name}");
 
-            return SerializerUtility.TryDeserialize(typeEntity, path) as CMSEntityCore;
+            return SerializerUtility.TryDeserialize(typeEntity, xmlData) as CMSEntityCore;
         }
 
         /// <summary>
@@ -38,36 +38,16 @@ namespace BitterCMS.CMSSystem
         /// </summary>
         /// <typeparam name="T">Type of the entity</typeparam>
         /// <returns>The deserialized entity</returns>
-        public static T GetEntity<T>() where T : CMSEntityCore, new()
-        {
-            var path = GetPath<T>();
-            if (string.IsNullOrEmpty(path))
-                throw new EntityNotFoundException($"Path not found for entity type: {typeof(T).Name}");
-
-            return SerializerUtility.TryDeserialize<T>(path);
-        }
+        public static T GetEntity<T>() where T : CMSEntityCore, new() => GetEntity(typeof(T)) as T;
 
         /// <summary>
-        /// Gets the storage path for an entity type
+        /// Gets all registered entities and their XML data
         /// </summary>
-        /// <param name="typeEntity">Type of the entity</param>
-        /// <returns>The storage path if found, null otherwise</returns>
-        public static string GetPath(Type typeEntity)
-        {
-            EnsureInitialized(() => new EntityDatabase());
-            return AllEntity.GetValueOrDefault(typeEntity);
-        }
-
-        public static string GetPath<T>() where T : CMSEntityCore => GetPath(typeof(T));
-
-        /// <summary>
-        /// Gets all registered entities and their paths
-        /// </summary>
-        /// <returns>Read-only dictionary of entity types and paths</returns>
+        /// <returns>Read-only dictionary of entity types and XML data</returns>
         public static IReadOnlyDictionary<Type, string> GetAll()
         {
             EnsureInitialized(() => new EntityDatabase());
-            return new Dictionary<Type, string>(AllEntity);
+            return new Dictionary<Type, string>(AllEntityXmlData);
         }
 
         public override void Initialize(bool forceUpdate = false)
@@ -78,17 +58,16 @@ namespace BitterCMS.CMSSystem
             try
             {
                 if (forceUpdate)
-                {
-                    AllEntity.Clear();
-                }
+                    AllEntityXmlData.Clear();
 
                 var allImplementEntity = ReflectionUtility.FindAllImplement<CMSEntityCore>()
                     .Where(entity => entity.IsDefined(typeof(SerializableAttribute), false));
 
                 foreach (var typeEntity in allImplementEntity)
                 {
-                    var fullPath = GetPathToXmlEntity(typeEntity);
-                    AllEntity.TryAdd(typeEntity, fullPath);
+                    var textAsset = Resources.Load<TextAsset>(GetRelativePathToXmlEntity(typeEntity));
+                    if (textAsset)
+                        AllEntityXmlData.TryAdd(typeEntity, textAsset.text);
                 }
 
                 IsInit = true;
@@ -100,16 +79,34 @@ namespace BitterCMS.CMSSystem
             }
         }
 
-        private string GetPathToXmlEntity(Type typeEntity)
+        public static void SaveEntity(Type entityType)
         {
-            var directoryPath = PathUtility.GetFullPath(PathProject.CMS_ENTITIES);
-            if (!Directory.Exists(directoryPath))
-            {
-                Directory.CreateDirectory(directoryPath);
-            }
+            if (!AllEntityXmlData.TryGetValue(entityType, out var xmlData))
+                throw new EntityNotFoundException($"XML data not found for entity type: {entityType.Name}");
+            
+            var relativePath = GetRelativePathToXmlEntity(entityType);
+            var fullPath = Path.Combine(
+                Application.dataPath,
+                $"!{Application.productName}",
+                relativePath + ".xml");
 
-            var fileName = $"{typeEntity.Name}.xml";
-            return Path.Combine(directoryPath, fileName);
+            File.WriteAllText(fullPath, xmlData);
+            Debug.Log($"Entity saved to: {fullPath}");
+        }
+
+        public static void UpdateEntityData(Type entityType)
+        {
+            if (!typeof(CMSEntityCore).IsAssignableFrom(entityType))
+                throw new TypeAccessException("Type must inherit from CMSEntity");
+
+            var xmlData = Resources.Load<TextAsset>(GetRelativePathToXmlEntity(entityType)).text;
+
+            AllEntityXmlData[entityType] = xmlData;
+        }
+
+        private static string GetRelativePathToXmlEntity(Type typeEntity)
+        {
+            return Path.Combine(PathProject.CMS_ENTITIES, typeEntity.Name);
         }
     }
 }

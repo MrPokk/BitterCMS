@@ -10,7 +10,7 @@ namespace BitterCMS.CMSSystem
 
         public void Init()
         {
-            UpdateDatabase();
+            UpdateDatabase(true);
         }
 
         public static void UpdateDatabase(bool forceUpdate = false)

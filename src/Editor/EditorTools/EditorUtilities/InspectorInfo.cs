@@ -33,8 +33,7 @@ namespace BitterCMS.UnityIntegration.Editor
         private CMSEntityCore GetDeserializedEntity()
         {
             return UnityXmlConverter.DeserializeEntityFromXml(
-                SerializerUtility.GetTypeFromXmlFile(
-                    AssetDatabase.GetAssetPath(SelectedXmlAsset)), SelectedXmlAsset) as CMSEntityCore;
+                SerializerUtility.GetTypeFromXmlFile(AssetDatabase.GetAssetPath(SelectedXmlAsset)), SelectedXmlAsset) as CMSEntityCore;
         }
     }
 }

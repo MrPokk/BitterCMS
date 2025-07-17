@@ -2,6 +2,7 @@
 using BitterCMS.CMSSystem;
 using BitterCMS.System.Serialization;
 using BitterCMS.Utility;
+using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -117,16 +118,13 @@ namespace BitterCMS.UnityIntegration.Editor
             {
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 EditorGUILayout.LabelField(entity.Key.Name, EditorStyles.boldLabel);
-
-                var relativePath = PathUtility.GetRelativePath(entity.Value);
-
+                
                 if (GUILayout.Button("Create", GUILayout.Height(20)))
                 {
-                    SerializerUtility.TrySerialize(entity.Key, entity.Value);
+                    EntityDatabase.SaveEntity(entity.Key);
                     isRecreate = true;
                 }
 
-                EditorGUILayout.SelectableLabel(relativePath, EditorStyles.textField, GUILayout.Height(20));
                 EditorGUILayout.EndVertical();
                 EditorGUILayout.Space(5);
             }

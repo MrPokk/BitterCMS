@@ -58,9 +58,7 @@ namespace BitterCMS.CMSSystem
             try
             {
                 if (forceUpdate)
-                {
                     AllView.Clear();
-                }
 
                 var allGameObjects = Resources.LoadAll<GameObject>(PathProject.CMS_VIEWS);
                 if (allGameObjects == null || allGameObjects.Length == 0)
@@ -71,7 +69,8 @@ namespace BitterCMS.CMSSystem
 
                 foreach (var view in allGameObjects)
                 {
-                    if (!view) continue;
+                    if (!view) 
+                        continue;
 
                     var component = view.GetComponent<CMSViewCore>();
                     if (!component)

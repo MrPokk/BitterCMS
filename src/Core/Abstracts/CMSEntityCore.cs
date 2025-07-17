@@ -86,12 +86,8 @@ namespace BitterCMS.CMSSystem
         /// </summary>
         public void RefreshComponent()
         {
-            var path = EntityDatabase.GetPath(ID);
-            if (path == null)
-                return;
-
-            if (SerializerUtility.TryDeserialize(ID, path) is not CMSEntityCore deserializeEntity)
-                return;
+            EntityDatabase.UpdateEntityData(ID);
+            var deserializeEntity = EntityDatabase.GetEntity(ID);
 
             var allDeserializeComponent = deserializeEntity.GetAllComponents();
             foreach (var typeComponent in deserializeEntity.GetExtraType())
@@ -186,7 +182,7 @@ namespace BitterCMS.CMSSystem
 
         public void WriteXml(XmlWriter writer)
         {
-            EntitySerializer.WriteXml(writer, GetSerializableComponents(),this);
+            EntitySerializer.WriteXml(writer, GetSerializableComponents(), this);
         }
 
         public Type[] GetExtraType()

@@ -1,4 +1,5 @@
 using BitterCMS.CMSSystem.Exceptions;
+using BitterCMS.Utility;
 using BitterCMS.Utility.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -49,13 +50,9 @@ namespace BitterCMS.CMSSystem
             try
             {
                 if (forceUpdate)
-                {
                     ComponentTypesCache.Clear();
-                }
 
-                var componentTypes = AppDomain.CurrentDomain.GetAssemblies()
-                    .SelectMany(assembly => assembly.GetTypes())
-                    .Where(t => !t.IsAbstract && typeof(IEntityComponent).IsAssignableFrom(t));
+                var componentTypes = ReflectionUtility.FindAllAssignments<IEntityComponent>();
 
                 foreach (var type in componentTypes)
                 {

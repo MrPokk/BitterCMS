@@ -10,6 +10,8 @@ namespace BitterCMS.Utility
     {
         private static string[] _cachedPaths = null;
         private static int _cachedFieldCount = 0;
+
+        private const string ROOT_PATH = "Resources";
         
         public static void GenerationConstPath()
         {
@@ -28,8 +30,10 @@ namespace BitterCMS.Utility
                 Console.WriteLine(ex.Message);
             }
         }
+        
+        
 
-        public static string[] GetAllPaths()
+        private static string[] GetAllPaths()
         {
             if (IsCacheValid())
                 return _cachedPaths;
@@ -56,69 +60,21 @@ namespace BitterCMS.Utility
                 .ToArray();
         }
 
-        public static string GetFullPath(string pathBase, string extraPath = "Resources")
+        private static string GetFullPath(string pathBase)
         {
             var allBasePath = GetAllPaths();
 
             if (!allBasePath.Contains(pathBase))
-                throw new ArgumentException("ERROR: Path not found");
-
-            var fullPath = $"{Application.dataPath}/!{Application.productName}/{extraPath}/{pathBase}";
+                throw new ArgumentException($"ERROR: Path not base: {pathBase}");
             
+
+            var fullPath = Path.Combine(
+                Application.dataPath,
+                $"!{Application.productName}",
+                ROOT_PATH,
+                pathBase);
+
             return fullPath;
-        }
-
-        public static string GetRelativePath(string absolutePath)
-        {
-            var projectPath = Application.dataPath;
-            var relativePath = Path.GetRelativePath(projectPath, absolutePath);
-            return relativePath;
-        }
-
-        public static void ValidatePath(ref string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-                throw new ArgumentException("Path cannot be null or whitespace", nameof(path));
-
-            try
-            {
-                var fullPath = Path.GetFullPath(path);
-
-                if (path.Any(c => Path.GetInvalidPathChars().Contains(c)))
-                    throw new ArgumentException("Path contains invalid characters");
-
-                var directory = Path.GetDirectoryName(fullPath);
-                if (!Directory.Exists(directory))
-                {
-                    if (directory != null)
-                        Directory.CreateDirectory(directory);
-                }
-
-                if (!HasWritePermission(directory))
-                    throw new UnauthorizedAccessException($"No write permissions for directory: {directory}");
-
-                if (!path.EndsWith(Path.AltDirectorySeparatorChar))
-                    path += Path.AltDirectorySeparatorChar;
-            }
-            catch (Exception ex) when (ex is ArgumentException or PathTooLongException)
-            {
-                throw new ArgumentException($"Invalid path: {path}", nameof(path), ex);
-            }
-        }
-
-        private static bool HasWritePermission(string directoryPath)
-        {
-            try
-            {
-                var permissionFile = Path.Combine(directoryPath, Guid.NewGuid().ToString());
-                File.WriteAllText(permissionFile, "Permission");
-                File.Delete(permissionFile);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
         }
 
     }
