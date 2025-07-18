@@ -68,6 +68,8 @@ namespace BitterCMS.CMSSystem
                     var textAsset = Resources.Load<TextAsset>(GetRelativePathToXmlEntity(typeEntity));
                     if (textAsset)
                         AllEntityXmlData.TryAdd(typeEntity, textAsset.text);
+                    else
+                        AllEntityXmlData.TryAdd(typeEntity, GetRelativePathToXmlEntity(typeEntity));
                 }
 
                 IsInit = true;
@@ -88,10 +90,10 @@ namespace BitterCMS.CMSSystem
             var fullPath = Path.Combine(
                 Application.dataPath,
                 $"!{Application.productName}",
+                "Resources",
                 relativePath + ".xml");
 
-            File.WriteAllText(fullPath, xmlData);
-            Debug.Log($"Entity saved to: {fullPath}");
+            SerializerUtility.TrySerialize(entityType, fullPath);
         }
 
         public static void UpdateEntityData(Type entityType)
