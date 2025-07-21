@@ -10,7 +10,7 @@ namespace BitterCMS.UnityIntegration.Utility
         private static CoroutineUtility _instance;
         private static CoroutineUtility Instance {
             get {
-                if (_instance != null)
+                if (_instance)
                     return _instance;
 
                 var manager = new GameObject("[CoroutineUtility]").AddComponent<CoroutineUtility>();
@@ -28,11 +28,16 @@ namespace BitterCMS.UnityIntegration.Utility
         #region [Public Methods]
         public static Coroutine Run(IEnumerator coroutine)
         {
-            return Instance.CRun(coroutine);
+            if (coroutine != null)
+                return Instance.CRun(coroutine);
+            
+            Debug.LogWarning("Attempted to start a null coroutine, return: yield break");
+            return null;
         }
 
         public static void Stop(IEnumerator coroutine)
         {
+            if (coroutine == null) return;
             Instance.CStop(coroutine);
         }
 
@@ -54,6 +59,11 @@ namespace BitterCMS.UnityIntegration.Utility
         public static void UnsubscribeAllCoroutine()
         {
             Instance.CUnsubscribeAllCoroutine();
+        }
+
+        public static bool IsAllCoroutinesFinished()
+        {
+            return Instance._activeCoroutines.Count == 0;
         }
         #endregion
         
@@ -117,7 +127,7 @@ namespace BitterCMS.UnityIntegration.Utility
 
             if (!_activeCoroutines.ContainsKey(coroutine))
                 yield break;
-
+            
             _activeCoroutines.Remove(coroutine);
             NotifyCoroutineStopped(coroutine);
         }

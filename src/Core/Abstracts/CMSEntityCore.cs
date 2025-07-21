@@ -25,7 +25,7 @@ namespace BitterCMS.CMSSystem
         [XmlIgnore]
         [field: NonSerialized]
         public CMSPresenterCore.CMSPresenterProperty Properties { get; set; }
-
+        
         /// <summary>
         /// Gets the number of components attached to this entity
         /// </summary>
@@ -117,6 +117,23 @@ namespace BitterCMS.CMSSystem
         public T GetComponent<T>() where T : class, IEntityComponent
         {
             return _components.TryGetValue(typeof(T), out var component) ? (T)component : null;
+        }
+        
+        
+        /// <summary>
+        /// Gets a value from component using selector function or returns default value if component doesn't exist
+        /// </summary>
+        /// <typeparam name="TComponent">Type of the component</typeparam>
+        /// <typeparam name="TResult">Type of the returned value</typeparam>
+        /// <param name="selector">Function to extract value from component</param>
+        /// <param name="defaultValue">Value to return if component not found</param>
+        /// <returns>Selected value or default</returns>
+        public TResult SetComponentValue<TComponent, TResult>(
+            Func<TComponent, TResult> selector, 
+            TResult defaultValue = default) 
+            where TComponent : class, IEntityComponent
+        {
+            return TryGetComponent<TComponent>(out var component) ? selector(component) : defaultValue;
         }
 
         /// <summary>

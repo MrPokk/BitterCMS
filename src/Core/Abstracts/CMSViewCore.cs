@@ -9,19 +9,26 @@ namespace BitterCMS.CMSSystem
         public Type ID => GetType();
         public CMSPresenterCore.CMSPresenterProperty Properties { get; set; }
 
-        public void Init(CMSPresenterCore.CMSPresenterProperty property)
+        private CMSEntityCore _model;
+
+        public virtual void Init(CMSPresenterCore.CMSPresenterProperty property)
         {
             Properties ??= property;
         }
 
         public CMSEntityCore GetModel()
         {
-            return Properties.PresenterCore.GetEntityByView(this);
+            return _model ??= Properties?.PresenterCore?.GetEntityByView(this);
         }
 
         public T GetModel<T>() where T : CMSEntityCore
         {
             return GetModel() as T;
+        }
+
+        public void Destroy()
+        {
+            Properties?.PresenterCore?.DestroyEntity(GetModel());
         }
     }
 }

@@ -27,7 +27,7 @@ namespace BitterCMS.CMSSystem
             if (!typeof(CMSEntityCore).IsAssignableFrom(typeEntity))
                 throw new TypeAccessException("Type must inherit from CMSEntity");
 
-            if (!AllEntityXmlData.TryGetValue(typeEntity, out var xmlData))
+            if (!AllEntityXmlData.TryGetValue(typeEntity, out var xmlData) || xmlData == GetRelativePathToXmlEntity(typeEntity))
                 throw new EntityNotFoundException($"XML data not found for entity type: {typeEntity.Name}");
 
             return SerializerUtility.TryDeserialize(typeEntity, xmlData) as CMSEntityCore;
@@ -85,7 +85,7 @@ namespace BitterCMS.CMSSystem
         {
             if (!AllEntityXmlData.TryGetValue(entityType, out var xmlData))
                 throw new EntityNotFoundException($"XML data not found for entity type: {entityType.Name}");
-            
+
             var relativePath = GetRelativePathToXmlEntity(entityType);
             var fullPath = Path.Combine(
                 Application.dataPath,

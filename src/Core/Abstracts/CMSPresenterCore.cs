@@ -1,4 +1,5 @@
 using BitterCMS.Component;
+using BitterCMS.UnityIntegration.Utility;
 using BitterCMS.Utility.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -155,12 +156,13 @@ namespace BitterCMS.CMSSystem
             }
 
             var newView = LinkingMonobehaviour(newEntityCore, view, info.Position, info.Rotation, info.Parent);
-            newView?.Init(new CMSPresenterProperty(this));
 
-            if (newView != null)
+            if (newView)
                 _entitiesWithViews.Add(newEntityCore, newView);
             else
                 _entitiesWithoutViews.Add(newEntityCore);
+            
+            newView?.Init(new CMSPresenterProperty(this));
 
             return newEntityCore;
         }
@@ -179,12 +181,13 @@ namespace BitterCMS.CMSSystem
             }
 
             var newView = LinkingMonobehaviour(cmsEntityCore, view, info.Position, info.Rotation, info.Parent);
-            newView?.Init(new CMSPresenterProperty(this));
 
-            if (newView != null)
+            if (newView)
                 _entitiesWithViews.Add(cmsEntityCore, newView);
             else
                 _entitiesWithoutViews.Add(cmsEntityCore);
+            
+            newView?.Init(new CMSPresenterProperty(this));
 
             return cmsEntityCore;
         }
@@ -324,39 +327,46 @@ namespace BitterCMS.CMSSystem
 
         #region [DestroyEntity]
 
+        #region [DestroyEntity]
+
         public void LateUpdate(float timeDelta)
         {
             if (!AllDestroy.Any())
                 return;
 
-            foreach (var entityToDestroy in AllDestroy)
-            {
-                if (_entitiesWithViews.TryGetValue(entityToDestroy, out var view))
-                {
-                    Object.Destroy(view.gameObject);
-                    _entitiesWithViews.Remove(entityToDestroy);
-                }
-                else if (_entitiesWithoutViews.Contains(entityToDestroy))
-                {
-                    _entitiesWithoutViews.Remove(entityToDestroy);
-                }
-            }
+            var entitiesToDestroy = new List<CMSEntityCore>(AllDestroy);
             AllDestroy.Clear();
+
+            foreach (var entityToDestroy in entitiesToDestroy)
+            {
+                var entityPresenter = entityToDestroy?.Properties?.PresenterCore;
+                if (entityPresenter == null)
+                    continue;
+
+                if (entityPresenter._entitiesWithViews.TryGetValue(entityToDestroy, out var view))
+                {
+                    if (view && view.gameObject)
+                        Object.Destroy(view.gameObject);
+                    entityPresenter._entitiesWithViews.Remove(entityToDestroy);
+                }
+                else if (entityPresenter._entitiesWithoutViews.Contains(entityToDestroy))
+                    entityPresenter._entitiesWithoutViews.Remove(entityToDestroy);
+            }
         }
 
         public virtual void DestroyEntity(CMSEntityCore entityCore)
         {
-            if (entityCore == null)
+            if (entityCore == null || !AllDestroy.Add(entityCore))
                 return;
-
-            AllDestroy.Add(entityCore);
         }
 
         public virtual void DestroyAllEntities()
         {
+            CoroutineUtility.StopAll();
+
             foreach (var view in _entitiesWithViews.Values)
             {
-                if (view && view.gameObject)
+                if (view != null && view.gameObject != null)
                     Object.Destroy(view.gameObject);
             }
 
@@ -364,16 +374,17 @@ namespace BitterCMS.CMSSystem
             _entitiesWithoutViews.Clear();
         }
 
+        #endregion 
+
         #endregion
 
         #region [Helper Methods]
 
         public bool IsTypeAllowed(Type type)
         {
-            if (_allowedEntityTypes.Count == 0)
-                return typeof(CMSEntityCore).IsAssignableFrom(type);
-
-            return _allowedEntityTypes.Any(allowedType => allowedType.IsAssignableFrom(type));
+            return _allowedEntityTypes.Count == 0 
+                ? typeof(CMSEntityCore).IsAssignableFrom(type) 
+                : _allowedEntityTypes.Any(allowedType => allowedType.IsAssignableFrom(type));
         }
 
         #endregion
